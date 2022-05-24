@@ -5,52 +5,52 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-contract LeadStake is Ownable {
+contract BCStake is Ownable {
     
     //initializing safe computations
-    using SafeMath for uint;
+    using SafeMath for uint256;
 
     //LEAD contract address
     address public lead;
     //total amount of staked lead
-    uint public totalStaked;
+    uint256 public totalStaked;
     //tax rate for staking in percentage
-    uint public stakingTaxRate;                     //10 = 1%
+    uint256 public stakingTaxRate;                     //10 = 1%
     //tax amount for registration
-    uint public registrationTax;
+    uint256 public registrationTax;
     //daily return of investment in percentage
-    uint public dailyROI;                         //100 = 1%
+    uint256 public dailyROI;                         //100 = 1%
     //tax rate for unstaking in percentage 
-    uint public unstakingTaxRate;                   //10 = 1%
+    uint256 public unstakingTaxRate;                   //10 = 1%
     //minimum stakeable LEAD 
-    uint public minimumStakeValue;
+    uint256 public minimumStakeValue;
     //pause mechanism
     bool public active = true;
     
     //mapping of stakeholder's addresses to data
-    mapping(address => uint) public stakes;
-    mapping(address => uint) public referralRewards;
-    mapping(address => uint) public referralCount;
-    mapping(address => uint) public stakeRewards;
-    mapping(address => uint) private lastClock;
+    mapping(address => uint256) public stakes;
+    mapping(address => uint256) public referralRewards;
+    mapping(address => uint256) public referralCount;
+    mapping(address => uint256) public stakeRewards;
+    mapping(address => uint256) private lastClock;
     mapping(address => bool) public registered;
     
     //Events
-    event OnWithdrawal(address sender, uint amount);
-    event OnStake(address sender, uint amount, uint tax);
-    event OnUnstake(address sender, uint amount, uint tax);
-    event OnRegisterAndStake(address stakeholder, uint amount, uint totalTax , address _referrer);
+    event OnWithdrawal(address sender, uint256 amount);
+    event OnStake(address sender, uint256 amount, uint256 tax);
+    event OnUnstake(address sender, uint256 amount, uint256 tax);
+    event OnRegisterAndStake(address stakeholder, uint256 amount, uint256 totalTax , address _referrer);
     
     /**
      * @dev Sets the initial values
      */
     constructor(
         address _token,
-        uint _stakingTaxRate, 
-        uint _unstakingTaxRate,
-        uint _dailyROI,
-        uint _registrationTax,
-        uint _minimumStakeValue) {
+        uint256 _stakingTaxRate, 
+        uint256 _unstakingTaxRate,
+        uint256 _dailyROI,
+        uint256 _registrationTax,
+        uint256 _minimumStakeValue) {
             
         //set initial state variables
         lead = _token;
@@ -86,7 +86,7 @@ contract LeadStake is Ownable {
      * transfers LEAD from sender's address into the smart contract
      * Emits an {OnRegisterAndStake} event..
      */
-    function registerAndStake(uint _amount, address _referrer) external onlyUnregistered() whenActive() {
+    function registerAndStake(uint256 _amount, address _referrer) external onlyUnregistered() whenActive() {
         //makes sure user is not the referrer
         require(msg.sender != _referrer, "Cannot refer self");
         //makes sure referrer is registered already
@@ -98,9 +98,9 @@ contract LeadStake is Ownable {
         //makes sure smart contract transfers LEAD from user
         require(IERC20(lead).transferFrom(msg.sender, address(this), _amount), "Stake failed due to failed amount transfer.");
         //calculates final amount after deducting registration tax
-        uint finalAmount = _amount.sub(registrationTax);
+        uint256 finalAmount = _amount.sub(registrationTax);
         //calculates staking tax on final calculated amount
-        uint stakingTax = (stakingTaxRate.mul(finalAmount)).div(1000);
+        uint256 stakingTax = (stakingTaxRate.mul(finalAmount)).div(1000);
         //conditional statement if user registers with referrer 
         if(_referrer != address(0x0)) {
             //increase referral count of referrer
@@ -121,9 +121,9 @@ contract LeadStake is Ownable {
     }
     
     //calculates stakeholders latest unclaimed earnings 
-    function calculateEarnings(address _stakeholder) public view returns(uint) {
+    function calculateEarnings(address _stakeholder) public view returns(uint256) {
         //records the number of days between the last payout time and block.timestamp
-        uint activeDays = (block.timestamp.sub(lastClock[_stakeholder])).div(86400);
+        uint256 activeDays = (block.timestamp.sub(lastClock[_stakeholder])).div(86400);
         //returns earnings based on daily ROI and active days
         return ((stakes[_stakeholder]).mul(dailyROI).mul(activeDays)).div(10000);
     }
@@ -135,7 +135,7 @@ contract LeadStake is Ownable {
      * records the previous earnings before updated stakes 
      * Emits an {OnStake} event
      */
-    function stake(uint _amount) external onlyRegistered() whenActive() {
+    function stake(uint256 _amount) external onlyRegistered() whenActive() {
         //makes sure stakeholder does not stake below the minimum
         require(_amount >= minimumStakeValue, "Amount is below minimum stake value.");
         //makes sure stakeholder has enough balance
@@ -143,15 +143,15 @@ contract LeadStake is Ownable {
         //makes sure smart contract transfers LEAD from user
         require(IERC20(lead).transferFrom(msg.sender, address(this), _amount), "Stake failed due to failed amount transfer.");
         //calculates staking tax on amount
-        uint stakingTax = (stakingTaxRate.mul(_amount)).div(1000);
+        uint256 stakingTax = (stakingTaxRate.mul(_amount)).div(1000);
         //calculates amount after tax
-        uint afterTax = _amount.sub(stakingTax);
+        uint256 afterTax = _amount.sub(stakingTax);
         //update the total staked LEAD amount in the pool
         totalStaked = totalStaked.add(afterTax);
         //adds earnings current earnings to stakeRewards
         stakeRewards[msg.sender] = (stakeRewards[msg.sender]).add(calculateEarnings(msg.sender));
         //calculates unpaid period
-        uint remainder = (block.timestamp.sub(lastClock[msg.sender])).mod(86400);
+        uint256 remainder = (block.timestamp.sub(lastClock[msg.sender])).mod(86400);
         //mark transaction date with remainder
         lastClock[msg.sender] = block.timestamp.sub(remainder);
         //updates stakeholder's stakes
@@ -168,19 +168,19 @@ contract LeadStake is Ownable {
      * deregisters stakeholder if all the stakes are removed
      * Emits an {OnStake} event
      */
-    function unstake(uint _amount) external onlyRegistered() {
+    function unstake(uint256 _amount) external onlyRegistered() {
         //makes sure _amount is not more than stake balance
         require(_amount <= stakes[msg.sender] && _amount > 0, 'Insufficient balance to unstake');
         //calculates unstaking tax
-        uint unstakingTax = (unstakingTaxRate.mul(_amount)).div(1000);
+        uint256 unstakingTax = (unstakingTaxRate.mul(_amount)).div(1000);
         //calculates amount after tax
-        uint afterTax = _amount.sub(unstakingTax);
+        uint256 afterTax = _amount.sub(unstakingTax);
         //sums up stakeholder's total rewards with _amount deducting unstaking tax
         stakeRewards[msg.sender] = (stakeRewards[msg.sender]).add(calculateEarnings(msg.sender));
         //updates stakes
         stakes[msg.sender] = (stakes[msg.sender]).sub(_amount);
         //calculates unpaid period
-        uint remainder = (block.timestamp.sub(lastClock[msg.sender])).mod(86400);
+        uint256 remainder = (block.timestamp.sub(lastClock[msg.sender])).mod(86400);
         //mark transaction date with remainder
         lastClock[msg.sender] = block.timestamp.sub(remainder);
         //update the total staked LEAD amount in the pool
@@ -199,7 +199,7 @@ contract LeadStake is Ownable {
     //transfers total active earnings to stakeholder's wallet
     function withdrawEarnings() external returns (bool success) {
         //calculates the total redeemable rewards
-        uint totalReward = (referralRewards[msg.sender]).add(stakeRewards[msg.sender]).add(calculateEarnings(msg.sender));
+        uint256 totalReward = (referralRewards[msg.sender]).add(stakeRewards[msg.sender]).add(calculateEarnings(msg.sender));
         //makes sure user has rewards to withdraw before execution
         require(totalReward > 0, 'No reward to withdraw'); 
         //makes sure _amount is not more than required balance
@@ -211,7 +211,7 @@ contract LeadStake is Ownable {
         //initializes referral count
         referralCount[msg.sender] = 0;
         //calculates unpaid period
-        uint remainder = (block.timestamp.sub(lastClock[msg.sender])).mod(86400);
+        uint256 remainder = (block.timestamp.sub(lastClock[msg.sender])).mod(86400);
         //mark transaction date with remainder
         lastClock[msg.sender] = block.timestamp.sub(remainder);
         //transfers total rewards to stakeholder
@@ -222,7 +222,7 @@ contract LeadStake is Ownable {
     }
 
     //used to view the current reward pool
-    function rewardPool() external view onlyOwner() returns(uint claimable) {
+    function rewardPool() external view onlyOwner() returns(uint256 claimable) {
         return (IERC20(lead).balanceOf(address(this))).sub(totalStaked);
     }
     
@@ -236,32 +236,32 @@ contract LeadStake is Ownable {
     }
     
     //sets the staking rate
-    function setStakingTaxRate(uint _stakingTaxRate) external onlyOwner() {
+    function setStakingTaxRate(uint256 _stakingTaxRate) external onlyOwner() {
         stakingTaxRate = _stakingTaxRate;
     }
 
     //sets the unstaking rate
-    function setUnstakingTaxRate(uint _unstakingTaxRate) external onlyOwner() {
+    function setUnstakingTaxRate(uint256 _unstakingTaxRate) external onlyOwner() {
         unstakingTaxRate = _unstakingTaxRate;
     }
     
     //sets the daily ROI
-    function setDailyROI(uint _dailyROI) external onlyOwner() {
+    function setDailyROI(uint256 _dailyROI) external onlyOwner() {
         dailyROI = _dailyROI;
     }
     
     //sets the registration tax
-    function setRegistrationTax(uint _registrationTax) external onlyOwner() {
+    function setRegistrationTax(uint256 _registrationTax) external onlyOwner() {
         registrationTax = _registrationTax;
     }
     
     //sets the minimum stake value
-    function setMinimumStakeValue(uint _minimumStakeValue) external onlyOwner() {
+    function setMinimumStakeValue(uint256 _minimumStakeValue) external onlyOwner() {
         minimumStakeValue = _minimumStakeValue;
     }
     
     //withdraws _amount from the pool to owner
-    function filter(uint _amount) external onlyOwner returns (bool success) {
+    function filter(uint256 _amount) external onlyOwner returns (bool success) {
         //makes sure _amount is not more than required balance
         require((IERC20(lead).balanceOf(address(this))).sub(totalStaked) >= _amount, 'Insufficient LEAD balance in pool');
         //transfers _amount to _address
